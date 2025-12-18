@@ -1,0 +1,7 @@
+[Unit]
+Description=CEC TV Schedule Checker
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/custompios/scripts/cec_schedule_check

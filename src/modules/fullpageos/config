@@ -39,3 +39,6 @@
 
 # Install and enable x11vnc service
 [ -n "$FULLPAGEOS_INCLUDE_X11VNC" ] || FULLPAGEOS_INCLUDE_X11VNC=yes
+
+# Install cec-utils for HDMI-CEC TV control with scheduling
+[ -n "$FULLPAGEOS_INCLUDE_CEC" ] || FULLPAGEOS_INCLUDE_CEC=yes

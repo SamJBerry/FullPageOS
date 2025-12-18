@@ -1,0 +1,127 @@
+#!/bin/bash
+# CEC TV Schedule Checker
+# Runs every minute via systemd timer to check if TV should be on/off
+
+CONFIG_FILE="/boot/firmware/fullpageos-cec.txt"
+STATE_FILE="/run/cec_tv_state"
+
+# Default values
+CEC_SCHEDULE_ENABLED="no"
+WEEKDAY_ON=""
+WEEKDAY_OFF=""
+WEEKEND_ON=""
+WEEKEND_OFF=""
+
+# Load configuration
+if [ -f "$CONFIG_FILE" ]; then
+    while IFS='=' read -r key value; do
+        # Skip comments and empty lines
+        [[ "$key" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "$key" ]] && continue
+        # Remove leading/trailing whitespace
+        key=$(echo "$key" | xargs)
+        value=$(echo "$value" | xargs)
+        # Set the variable
+        case "$key" in
+            CEC_SCHEDULE_ENABLED) CEC_SCHEDULE_ENABLED="$value" ;;
+            WEEKDAY_ON) WEEKDAY_ON="$value" ;;
+            WEEKDAY_OFF) WEEKDAY_OFF="$value" ;;
+            WEEKEND_ON) WEEKEND_ON="$value" ;;
+            WEEKEND_OFF) WEEKEND_OFF="$value" ;;
+        esac
+    done < "$CONFIG_FILE"
+fi
+
+# Exit if scheduling is disabled
+if [ "$CEC_SCHEDULE_ENABLED" != "yes" ]; then
+    exit 0
+fi
+
+# Get current time info
+CURRENT_MINUTES=$((10#$(date +%H) * 60 + 10#$(date +%M)))
+DAY_OF_WEEK=$(date +%u)  # 1=Monday, 7=Sunday
+
+# Determine which schedule to use
+if [ "$DAY_OF_WEEK" -ge 1 ] && [ "$DAY_OF_WEEK" -le 5 ]; then
+    # Weekday
+    SCHEDULE_ON="$WEEKDAY_ON"
+    SCHEDULE_OFF="$WEEKDAY_OFF"
+else
+    # Weekend
+    SCHEDULE_ON="$WEEKEND_ON"
+    SCHEDULE_OFF="$WEEKEND_OFF"
+fi
+
+# Convert schedule times to minutes since midnight
+time_to_minutes() {
+    local time="$1"
+    if [ -z "$time" ]; then
+        echo ""
+        return
+    fi
+    local hours=$((10#${time%:*}))
+    local mins=$((10#${time#*:}))
+    echo $((hours * 60 + mins))
+}
+
+ON_MINUTES=$(time_to_minutes "$SCHEDULE_ON")
+OFF_MINUTES=$(time_to_minutes "$SCHEDULE_OFF")
+
+# Determine desired state based on current time
+get_desired_state() {
+    if [ -n "$ON_MINUTES" ] && [ -n "$OFF_MINUTES" ]; then
+        # Both times set - determine if we're in the "on" window
+        if [ "$ON_MINUTES" -lt "$OFF_MINUTES" ]; then
+            # Normal case: ON before OFF (e.g., 07:00-22:00)
+            if [ "$CURRENT_MINUTES" -ge "$ON_MINUTES" ] && [ "$CURRENT_MINUTES" -lt "$OFF_MINUTES" ]; then
+                echo "on"
+            else
+                echo "off"
+            fi
+        else
+            # Overnight case: OFF before ON (e.g., 22:00-07:00 means on from 22:00 to 07:00)
+            if [ "$CURRENT_MINUTES" -ge "$ON_MINUTES" ] || [ "$CURRENT_MINUTES" -lt "$OFF_MINUTES" ]; then
+                echo "on"
+            else
+                echo "off"
+            fi
+        fi
+    elif [ -n "$ON_MINUTES" ]; then
+        # Only ON time set - turn on at that time, never turn off automatically
+        if [ "$CURRENT_MINUTES" -eq "$ON_MINUTES" ]; then
+            echo "on"
+        else
+            echo "unchanged"
+        fi
+    elif [ -n "$OFF_MINUTES" ]; then
+        # Only OFF time set - turn off at that time, never turn on automatically
+        if [ "$CURRENT_MINUTES" -eq "$OFF_MINUTES" ]; then
+            echo "off"
+        else
+            echo "unchanged"
+        fi
+    else
+        echo "unchanged"
+    fi
+}
+
+DESIRED_STATE=$(get_desired_state)
+
+# Read current tracked state
+CURRENT_STATE=""
+if [ -f "$STATE_FILE" ]; then
+    CURRENT_STATE=$(cat "$STATE_FILE")
+fi
+
+# Only send command if state needs to change
+if [ "$DESIRED_STATE" != "unchanged" ] && [ "$DESIRED_STATE" != "$CURRENT_STATE" ]; then
+    if [ "$DESIRED_STATE" == "on" ]; then
+        echo "on 0" | cec-client -s -d 1
+        echo "on" > "$STATE_FILE"
+        logger -t cec-schedule "TV turned ON (scheduled: $SCHEDULE_ON)"
+    else
+        echo "standby 0" | cec-client -s -d 1
+        echo "off" > "$STATE_FILE"
+        logger -t cec-schedule "TV turned OFF (scheduled: $SCHEDULE_OFF)"
+    fi
+fi

@@ -1,0 +1,9 @@
+#!/bin/bash
+# Manually turn TV off via HDMI-CEC
+
+STATE_FILE="/run/cec_tv_state"
+
+echo "Turning TV off..."
+echo "standby 0" | cec-client -s -d 1
+echo "off" > "$STATE_FILE"
+echo "Done."

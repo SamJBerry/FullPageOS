@@ -161,6 +161,13 @@ then
     systemctl enable x11vnc.service
 fi
 
+#Setup CEC TV control
+if [ "$FULLPAGEOS_INCLUDE_CEC" == "yes" ]
+then
+    apt-get install -y --force-yes cec-utils
+    systemctl enable cec-schedule.timer
+fi
+
 #echo "sudo -u pi startx /opt/custompios/scripts/run_onepageos &" >> /etc/rc.local
 #echo "(sleep 15 ; sudo -u pi /opt/custompios/scripts/fullscreen) &" >> /etc/rc.local
 

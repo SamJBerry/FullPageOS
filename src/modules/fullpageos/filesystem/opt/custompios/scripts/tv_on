@@ -1,0 +1,9 @@
+#!/bin/bash
+# Manually turn TV on via HDMI-CEC
+
+STATE_FILE="/run/cec_tv_state"
+
+echo "Turning TV on..."
+echo "on 0" | cec-client -s -d 1
+echo "on" > "$STATE_FILE"
+echo "Done."

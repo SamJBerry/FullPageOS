@@ -1,0 +1,21 @@
+# FullPageOS CEC TV Schedule Configuration
+# =========================================
+# This file controls automatic TV on/off via HDMI-CEC.
+# Edit this file to set your schedule.
+#
+# Times must be in 24-hour format: HH:MM (e.g., 07:30, 22:00)
+# Leave a value blank or comment it out to disable that action.
+#
+# The TV will turn ON at the specified time and OFF at the specified time.
+# Different schedules can be set for weekdays vs weekends.
+
+# Master switch: set to "yes" to enable, "no" to disable
+CEC_SCHEDULE_ENABLED=no
+
+# Weekday schedule (Monday through Friday)
+WEEKDAY_ON=07:00
+WEEKDAY_OFF=22:00
+
+# Weekend schedule (Saturday and Sunday)
+WEEKEND_ON=09:00
+WEEKEND_OFF=23:00
